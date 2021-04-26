@@ -1,15 +1,20 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using ApplicationCore.Entities;
+using ApplicationCore.Interceptors;
+using ApplicationCore.Interfaces;
+using ApplicationCore.Services;
+using BestlaArquitectureApplicationCore.Extentions;
+using Castle.DynamicProxy;
+using Infrastructure.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.eShopWeb.Infrastructure.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
+using ThingsboardBestlaApi.Middlewares;
 
 namespace ThingsboardBestlaApi
 {
@@ -26,6 +31,39 @@ namespace ThingsboardBestlaApi
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+
+            services.AddDbContext<CatalogContext>(c =>
+                c.UseSqlServer(Configuration.GetConnectionString("CatalogConnection")));
+
+            services.AddProxiedScoped<IUserService, UserService>();
+            services.AddSingleton(new ProxyGenerator());
+            services.AddAllEntityAsyncRepositoryScoped<IAggregateRoot>(typeof(EfRepository<>));
+
+            
+            services.AddScoped<AsyncInterceptorBase, LoggingAsyncInterceptor>();
+            services.AddScoped(typeof(IUnitOfWork), typeof(UnitOfWork));
+            AddSwagger(services);
+        }
+
+        private void AddSwagger(IServiceCollection services)
+        {
+            services.AddSwaggerGen(options =>
+            {
+                var groupName = "v1";
+
+                options.SwaggerDoc(groupName, new OpenApiInfo
+                {
+                    Title = $"Notifications {groupName}",
+                    Version = groupName,
+                    Description = "Notifications API",
+                    Contact = new OpenApiContact
+                    {
+                        Name = "Bestla Company",
+                        Email = string.Empty,
+                        Url = new Uri("https://foo.com/"),
+                    }
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -35,8 +73,14 @@ namespace ThingsboardBestlaApi
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.ConfigureExceptionHandler();
 
             app.UseHttpsRedirection();
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Notifications API V1");
+            });
 
             app.UseRouting();
 

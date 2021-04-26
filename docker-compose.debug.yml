@@ -1,0 +1,29 @@
+﻿version: '3.4'
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-CU3-ubuntu-18.04
+    user: '0:0'
+    ports:
+      - 1433:1433
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: PasswordO1.
+      MSSQL_PID: Express
+    volumes:
+      - ~/docker/sqlserver-data:/var/opt/mssql
+
+  webapp:
+    build: .
+    ports:
+      - 8001:80
+      - 8002:443
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_HTTPS_PORT=8002
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=iori
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    volumes:
+      - ~/.aspnet/https:/https/
+    depends_on:
+      - db
